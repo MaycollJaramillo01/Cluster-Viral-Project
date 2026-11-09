@@ -390,7 +390,7 @@ class PillowCaptions:
             lines += [f"file '{name}'", f"duration {dur:.4f}"]
         lines.append(f"file '{entries[-1][0]}'")  # concat demuxer quirk: repeat the last file
         playlist = out_dir / "captions.ffconcat"
-        playlist.write_text("\n".join(lines) + "\n")
+        playlist.write_text("\n".join(lines) + "\n", encoding="utf-8")
         log.info("Captions: %d states rendered (%s style)", n, self.s.caption_style)
         return playlist
 
@@ -711,7 +711,7 @@ class ChatScreen:
             lines += [f"file '{name}'", f"duration {dur:.4f}"]
         lines.append(f"file '{entries[-1][0]}'")
         playlist = out_dir / "chat.ffconcat"
-        playlist.write_text("\n".join(lines) + "\n")
+        playlist.write_text("\n".join(lines) + "\n", encoding="utf-8")
         log.info("Chat screen: %d messages, %d states", len(messages), n)
         return playlist
 
@@ -909,7 +909,7 @@ def emoji_pops(settings: Settings, events: list[tuple[float, float, str]], total
     add(blank.name, total)
     lines.append(f"file '{blank.name}'")
     playlist = out_dir / "emoji.ffconcat"
-    playlist.write_text("\n".join(lines) + "\n")
+    playlist.write_text("\n".join(lines) + "\n", encoding="utf-8")
     cy = CENTER_Y.get(settings.caption_position, CENTER_Y["center"])
     y = int(settings.height * cy - settings.unit * 0.21 - canvas / 2)
     log.info("Emoji: %d", len(images))
