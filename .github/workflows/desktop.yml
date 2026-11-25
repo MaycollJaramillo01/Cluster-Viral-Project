@@ -80,9 +80,14 @@ jobs:
         with:
           python-version: "3.12.10"
       - name: Build the app and the .dmg
-        run: PYTHON=python packaging/macos/build_dmg.sh
+        # On failure the end of the output becomes an annotation, readable without signing in.
+        run: |
+          set -o pipefail
+          PYTHON=python packaging/macos/build_dmg.sh 2>&1 | tee build.log             || { echo "::error title=build_dmg.sh failed::$(tail -40 build.log | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')"; exit 1; }
       - name: Install, import a .env, open and render (end to end)
-        run: set -o pipefail; packaging/macos/verify.sh dist/*.dmg 2>&1 | tee "dist/verify-${{ matrix.kind }}.txt"
+        run: |
+          set -o pipefail
+          packaging/macos/verify.sh dist/*.dmg 2>&1 | tee "dist/verify-${{ matrix.kind }}.txt"             || { echo "::error title=verify.sh failed::$(tail -60 "dist/verify-${{ matrix.kind }}.txt" | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')"; exit 1; }
       - name: Logs of the check
         if: always()
         run: tail -100 "$HOME/Library/Application Support/PurffleShorts/logs/"*.log || true

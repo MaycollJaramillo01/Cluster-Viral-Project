@@ -45,10 +45,23 @@ if find "$APP" \( -name '.env' -o -name '*.env' -o -name 'credentials.json' -o -
         -o -name 'client_secret*.json' -o -name '*.pickle' -o -name '.keychain-names' \) | grep .; then
     echo "credential files found in the app"; exit 1
 fi
-KEYS='sk-[A-Za-z0-9_-]{20,}|sk-ant-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{35}|gsk_[A-Za-z0-9]{40,}|xai-[A-Za-z0-9]{40,}|ghp_[A-Za-z0-9]{36}|ya29\.[0-9A-Za-z_-]{20,}|1//0[0-9A-Za-z_-]{30,}'
+# Known key formats (OpenAI/Anthropic sk-, Google AIza/ya29/1//, Groq, xAI, GitHub), whole tokens only:
+# libraries carry harmless words such as "sk-ssh-ed25519-cert-v01".
+KEYS='(^|[^A-Za-z0-9])(sk-[A-Za-z0-9_-]*[A-Za-z0-9]{32}|AIza[0-9A-Za-z_-]{35}|gsk_[A-Za-z0-9]{40}|xai-[A-Za-z0-9]{40}|ghp_[A-Za-z0-9]{36}|ya29\.[0-9A-Za-z_-]{30}|1//0[0-9A-Za-z_-]{30})'
 # the app's own files, and the package sources it was built from (the app keeps them compressed)
 if grep -raEl "$KEYS" "$APP" purffle_shorts packaging pyproject.toml; then
     echo "a value that looks like an API key or token is in the app"; exit 1
+fi
+# Keys without a recognisable format (Pexels, Pixabay...): if this folder has a .env, none of its secret
+# values may be in the app. Only the setting's name is printed.
+if [ -f .env ]; then
+    grep -E '^[[:space:]]*(export[[:space:]]+)?[A-Z0-9_]*(_KEY|_TOKEN|_SECRET|PASSWORD|WEBHOOK)[[:space:]]*=' .env \
+    | while IFS='=' read -r name value; do
+        value=$(printf '%s' "$value" | tr -d "\"'\r" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        if [ ${#value} -ge 8 ] && grep -raqF -- "$value" "$APP"; then
+            echo "the value of ${name##* } from .env is in the app"; exit 1
+        fi
+    done
 fi
 
 echo "== Disk image"
