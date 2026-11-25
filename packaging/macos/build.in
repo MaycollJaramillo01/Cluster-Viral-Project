@@ -1,0 +1,2 @@
+# Build-only tools for the macOS app (the app's own dependencies come from pyproject.toml).
+pyinstaller

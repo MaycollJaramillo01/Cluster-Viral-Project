@@ -4,12 +4,28 @@ name: Desktop apps
 # Windows, macOS (Apple silicon and Intel) and Linux, with packaging/purffle-studio.spec. Each build is
 # zipped and attached to the release, so the website's download links can point at
 # https://github.com/Chamanrajragu/purffle-shorts/releases/latest/download/<file>.
-# The apps are unsigned: sign and notarize them before linking them from the website
+# macOS gets a drag-to-Applications .dmg per CPU (packaging/macos/build_dmg.sh), checked end to end on the
+# runner before upload (packaging/macos/verify.sh): install, .env import, launch, second launch, render.
+# The apps are unsigned (macOS: ad-hoc signed): sign and notarize them before linking them from the website
 # (see packaging/README.md).
 on:
   release:
     types: [published]
   workflow_dispatch:
+  push:
+    paths:
+      - "packaging/**"
+      - "purffle_shorts/desktop.py"
+      - "purffle_shorts/macapp.py"
+      - "purffle_shorts/envfile.py"
+      - ".github/workflows/desktop.yml"
+  pull_request:
+    paths:
+      - "packaging/**"
+      - "purffle_shorts/desktop.py"
+      - "purffle_shorts/macapp.py"
+      - "purffle_shorts/envfile.py"
+      - ".github/workflows/desktop.yml"
 
 permissions:
   contents: read
@@ -22,10 +38,6 @@ jobs:
         include:
           - os: windows-latest
             asset: PurffleShorts-Windows.zip
-          - os: macos-latest
-            asset: PurffleShorts-macOS-AppleSilicon.zip
-          - os: macos-15-intel
-            asset: PurffleShorts-macOS-Intel.zip
           - os: ubuntu-22.04
             asset: PurffleShorts-Linux.zip
     runs-on: ${{ matrix.os }}
@@ -40,9 +52,6 @@ jobs:
           python -m pip install . pyinstaller
       - name: Build
         run: pyinstaller packaging/purffle-studio.spec --noconfirm
-      - name: Zip (macOS keeps the .app's links and permissions)
-        if: runner.os == 'macOS'
-        run: ditto -c -k --keepParent dist/PurffleShorts.app "${{ matrix.asset }}"
       - name: Zip (Linux)
         if: runner.os == 'Linux'
         run: cd dist && zip -qr "../${{ matrix.asset }}" PurffleShorts
@@ -55,8 +64,39 @@ jobs:
           name: ${{ matrix.asset }}
           path: ${{ matrix.asset }}
 
+  macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15          # Apple silicon (arm64)
+            kind: AppleSilicon
+          - os: macos-15-intel    # Intel (x86_64)
+            kind: Intel
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12.10"
+      - name: Build the app and the .dmg
+        run: PYTHON=python packaging/macos/build_dmg.sh
+      - name: Install, import a .env, open and render (end to end)
+        run: set -o pipefail; packaging/macos/verify.sh dist/*.dmg 2>&1 | tee "dist/verify-${{ matrix.kind }}.txt"
+      - name: Logs of the check
+        if: always()
+        run: tail -100 "$HOME/Library/Application Support/PurffleShorts/logs/"*.log || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PurffleShorts-Studio-macOS-${{ matrix.kind }}
+          path: |
+            dist/*.dmg
+            dist/*.dmg.sha256
+            dist/verify-*.txt
+          if-no-files-found: error
+
   attach:
-    needs: build
+    needs: [build, macos]
     if: github.event_name == 'release'
     runs-on: ubuntu-latest
     permissions:
@@ -69,4 +109,4 @@ jobs:
       - name: Attach the apps to the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ github.event.release.tag_name }}" out/*.zip --clobber --repo "${{ github.repository }}"
+        run: gh release upload "${{ github.event.release.tag_name }}" out/*.zip out/*.dmg out/*.dmg.sha256 --clobber --repo "${{ github.repository }}"

@@ -3,6 +3,7 @@
 #   pyinstaller packaging/purffle-studio.spec --noconfirm
 # Output: dist/PurffleShorts/ (Windows, Linux) or dist/PurffleShorts.app (macOS). See packaging/README.md.
 # ruff: noqa
+import re
 import sys
 from pathlib import Path
 
@@ -32,6 +33,11 @@ exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name=NAME, console=False, i
           upx=False, disable_windowed_traceback=False)
 coll = COLLECT(exe, a.binaries, a.datas, name=NAME, upx=False)
 if sys.platform == "darwin":
-    app = BUNDLE(coll, name=f"{NAME}.app", icon=icon, bundle_identifier="com.purffle.shorts",
-                 info_plist={"CFBundleShortVersionString": "3.1.0", "NSHighResolutionCapable": True,
+    # The launcher starts the Studio in the background and quits, so the app never stays in the Dock
+    # (LSUIElement); each double-click runs it again and opens the Studio that is running.
+    version = re.search(r'__version__ = "([^"]+)"', (ROOT / "purffle_shorts" / "__init__.py").read_text()).group(1)
+    app = BUNDLE(coll, name="PurffleShorts Studio.app", icon=icon, bundle_identifier="com.purffle.shorts",
+                 info_plist={"CFBundleDisplayName": "PurffleShorts Studio", "CFBundleName": "PurffleShorts Studio",
+                             "CFBundleShortVersionString": version, "CFBundleVersion": version,
+                             "LSMinimumSystemVersion": "11.0", "LSUIElement": True, "NSHighResolutionCapable": True,
                              "LSApplicationCategoryType": "public.app-category.video"})

@@ -129,6 +129,13 @@ SCHEMA: list[dict] = [
 ]
 
 FIELDS: dict[str, dict] = {f["key"]: f for g in SCHEMA for f in g["fields"]}
+_SECRET_NAME = re.compile(r"(?:_KEY|_TOKEN|_SECRET|PASSWORD|WEBHOOK)$")
+
+
+def is_secret(key: str) -> bool:
+    """API keys, tokens, passwords and webhook URLs (the Settings page's secrets plus GOOGLE_API_KEY,
+    ANTHROPIC_AUTH_TOKEN, STUDIO_PASSWORD... and any other *_KEY / *_TOKEN someone adds)."""
+    return FIELDS.get(key, {}).get("kind") == "secret" or bool(_SECRET_NAME.search(key))
 
 
 def env_path() -> Path:
@@ -169,8 +176,18 @@ def read(path: Path | None = None) -> dict[str, str]:
 
 
 def write(updates: dict[str, str | None], path: Path | None = None) -> Path:
-    """Set (or, with None, remove) keys in .env, keeping every other line as it was."""
+    """Set (or, with None, remove) keys in .env, keeping every other line as it was.
+
+    In the macOS app secrets go to the Keychain instead, and only stay in the file if the Keychain refuses."""
     p = path or env_path()
+    from . import macapp
+    if macapp.keychain_enabled():
+        updates = dict(updates)
+        for key in [k for k in updates if is_secret(k)]:
+            if updates[key] is None:
+                macapp.keychain_delete(key)
+            elif macapp.keychain_set(key, updates[key]):
+                updates[key] = None  # in the Keychain: take it out of the file
     try:
         lines = p.read_text(encoding="utf-8").splitlines()
     except OSError:
