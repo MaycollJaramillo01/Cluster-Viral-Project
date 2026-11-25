@@ -5,7 +5,7 @@ PurffleShorts Studio as a double-click app for Windows, macOS and Linux. The app
 
 | Need | What the launcher does |
 | --- | --- |
-| A folder for settings and videos | `Documents/PurffleShorts` (or `PURFFLE_HOME`), created on first run |
+| A folder for settings and videos | `Documents/PurffleShorts` (or `PURFFLE_HOME`), created on first run; on macOS `~/Library/Application Support/PurffleShorts`, videos in `~/Movies/PurffleShorts` |
 | Clicking the icon twice | The second launch opens the Studio that is already running |
 | Port 8765 taken by another program | Uses a free port instead |
 | No console window | Output goes to `logs/desktop.log`; the app log stays in `logs/purffle.log` |
@@ -24,11 +24,38 @@ python -m pip install -e . pyinstaller
 pyinstaller packaging/purffle-studio.spec --noconfirm
 ```
 
-- macOS: `dist/PurffleShorts.app`
+- macOS: `dist/PurffleShorts Studio.app` (for the .dmg, see below)
 - Windows and Linux: the folder `dist/PurffleShorts/` with `PurffleShorts.exe` / `PurffleShorts`
 
 The build leaves out the big optional extras (Kokoro voice, faster-whisper, OpenCV, Torch) to keep the
 download small. Videos still get a free voice (edge-tts, or the system voice offline).
+
+## macOS: the .dmg
+
+```bash
+packaging/macos/build_dmg.sh     # dist/PurffleShorts-Studio-<version>-macOS-<AppleSilicon|Intel>.dmg
+packaging/macos/verify.sh dist/*.dmg   # CI only: installs, imports a test .env, renders a video
+```
+
+`build_dmg.sh` builds for the Mac it runs on, from the hash-pinned `macos/requirements.lock` (refresh it with
+`uv pip compile pyproject.toml packaging/macos/build.in --universal --python-version 3.12 --generate-hashes
+-o packaging/macos/requirements.lock`), and stops if anything that looks like a key or a credential file is in
+the app. The Desktop workflow builds and checks both CPUs and uploads the .dmg files as workflow artifacts.
+
+**Install:** open the .dmg and drag **PurffleShorts Studio** onto **Applications**. The first time, macOS
+says it can't check the app (it is not notarized): click **Done**, then **System Settings → Privacy &
+Security → Open Anyway** (on macOS 14 and older: right-click the app → **Open**).
+
+**First launch:** the app offers to import an existing `.env` (press ⌘⇧. in the file dialog to see hidden
+files). Keys and tokens (`*_API_KEY`, `*_TOKEN`, passwords, webhooks) go to the login Keychain under
+`com.purffle.shorts`; everything else goes to `~/Library/Application Support/PurffleShorts/.env` (mode 600).
+Windows paths are fixed: a `credentials.json` / `token.json` next to the `.env` is copied in privately,
+anything else missing is asked for again or reset to the default. Choose **Configure later** to set the
+AI providers on the Studio's Settings page instead (keys saved there also go to the Keychain).
+
+**Later:** hold **Option** while opening the app to import a `.env` again, choose the YouTube OAuth file,
+open the data folder or stop the Studio. Each normal double-click opens the Studio that is running (or
+starts it on 127.0.0.1, on another port if 8765 is taken). Logs: `logs/` in the data folder.
 
 ## Before publishing on the website
 
