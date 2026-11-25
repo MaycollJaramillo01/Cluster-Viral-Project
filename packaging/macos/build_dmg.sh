@@ -8,6 +8,11 @@
 # (imageio-ffmpeg), so the Mac it is installed on needs nothing else. The build stops if any secret-looking
 # file or value ends up in the app.
 set -euo pipefail
+if [ "$(uname -s)" != Darwin ]; then
+    echo "This builds a macOS app, so it only runs on a Mac (PyInstaller can't build for macOS elsewhere)."
+    echo "Copy this repository to a Mac and run: packaging/macos/build_dmg.sh"
+    exit 1
+fi
 cd "$(dirname "$0")/../.."
 PY=${PYTHON:-python3}
 ARCH=$(uname -m)
