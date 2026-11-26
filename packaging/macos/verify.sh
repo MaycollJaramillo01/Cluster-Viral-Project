@@ -172,3 +172,6 @@ pass "the fake key appears in no log, video folder or API answer"
 echo
 echo "All checks passed ($(uname -m), macOS $(sw_vers -productVersion)):"
 printf ' - %s\n' "${PASSED[@]}"
+# the same list as a GitHub annotation, readable on the run page without signing in
+[ -n "${GITHUB_ACTIONS:-}" ] && echo "::notice title=macOS check passed ($(uname -m), macOS $(sw_vers -productVersion))::$(printf '%s%%0A' "${PASSED[@]}")"
+true
